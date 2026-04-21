@@ -1,0 +1,26 @@
+{
+  "name": "minecraft-tchat-controller",
+  "version": "1.0.0",
+  "description": "Bot Twitch/Discord qui exécute des commandes Minecraft via RCON",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "minecraft",
+    "twitch",
+    "discord",
+    "rcon",
+    "bot"
+  ],
+  "author": "nomade",
+  "license": "MIT",
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "tmi.js": "^1.8.5",
+    "minecraft-server-util": "^3.5.5",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {}
+}

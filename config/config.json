@@ -1,0 +1,51 @@
+{
+  "minecraft": {
+    "rcon": {
+      "host": "localhost",
+      "port": 25575,
+      "password": "change_me"
+    }
+  },
+  "cooldown": {
+    "global": 5000,
+    "enabled": true
+  },
+  "commands": {
+    "tnt": {
+      "enabled": true,
+      "twitch": {
+        "count": 1
+      },
+      "discord": {
+        "count": 2
+      },
+      "description": "Spawn TNT"
+    },
+    "mob": {
+      "enabled": true,
+      "twitch": {
+        "count": 1,
+        "types": ["creeper", "zombie", "skeleton"]
+      },
+      "discord": {
+        "count": 3,
+        "types": ["creeper", "zombie", "skeleton"]
+      },
+      "description": "Spawn mobs"
+    },
+    "foudre": {
+      "enabled": true,
+      "twitch": {
+        "count": 1
+      },
+      "discord": {
+        "count": 2
+      },
+      "description": "Foudre sur le joueur"
+    }
+  },
+  "features": {
+    "notifications": true,
+    "logCommands": true
+  }
+}
