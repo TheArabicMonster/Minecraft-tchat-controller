@@ -1,5 +1,6 @@
 const { RCON } = require('minecraft-server-util');
 const config = require('../config');
+const overlayServer = require('../overlay/server');
 
 // État global
 let lastCommandTime = 0;
@@ -77,6 +78,7 @@ class RconClient {
     }
 
     this.updateCooldown();
+    overlayServer.registerCommand('tnt', count);
     
     if (config.features.notifications) {
       await this.notifyChat(source, '!tnt', count);
@@ -101,6 +103,7 @@ class RconClient {
     }
 
     this.updateCooldown();
+    overlayServer.registerCommand('mob', count);
 
     if (config.features.notifications) {
       await this.notifyChat(source, '!mob', count);
@@ -122,6 +125,7 @@ class RconClient {
     }
 
     this.updateCooldown();
+    overlayServer.registerCommand('foudre', count);
 
     if (config.features.notifications) {
       await this.notifyChat(source, '!foudre', count);
