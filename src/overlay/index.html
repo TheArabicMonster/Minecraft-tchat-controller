@@ -136,7 +136,7 @@
     function applyState(next) {
       if (!next) return;
       state.timer = next.timer || state.timer;
-      state.personalBestMs = next.personalBestMs || null;
+      state.personalBestMs = next.personalBestMs ?? null;
       state.counters = next.counters || state.counters;
       render();
     }
@@ -151,7 +151,9 @@
           if (data.type === 'state') {
             applyState(data.payload);
           }
-        } catch (_) {}
+        } catch (error) {
+          console.warn('Overlay WS payload invalide:', error);
+        }
       });
 
       ws.addEventListener('close', () => {

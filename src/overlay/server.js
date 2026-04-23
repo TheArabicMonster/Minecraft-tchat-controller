@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
-const { WebSocketServer } = require('ws');
+const { WebSocket, WebSocketServer } = require('ws');
 
 class OverlayServer {
   constructor() {
@@ -74,7 +74,11 @@ class OverlayServer {
       this.wss.clients.forEach((client) => {
         try {
           client.close();
-        } catch (_) {}
+        } catch (error) {
+          if (process.env.DEBUG === 'true') {
+            console.warn('⚠️ Erreur fermeture client overlay:', error.message);
+          }
+        }
       });
       this.wss.close();
       this.wss = null;
@@ -194,7 +198,7 @@ class OverlayServer {
     const message = JSON.stringify({ type: 'state', payload: this.getState() });
 
     this.wss.clients.forEach((client) => {
-      if (client.readyState === 1) {
+      if (client.readyState === WebSocket.OPEN) {
         client.send(message);
       }
     });
@@ -278,7 +282,7 @@ class OverlayServer {
 
     const normalized = line.toLowerCase();
 
-    const isSpawn = /joined the game|logged in with entity id/.test(normalized);
+    const isSpawn = /joined the game|logged in with entity id|a rejoint la partie/.test(normalized);
     if (isSpawn && (!this.state.timer.startedAt || this.state.timer.endedAt)) {
       this.registerPlayerSpawn();
       return;
@@ -294,7 +298,7 @@ class OverlayServer {
     }
 
     const isPlayerDeath =
-      /( was slain by | was shot by | was blown up by | was fireballed by | drowned| hit the ground too hard| fell from a high place| burned to death| went up in flames| died| was killed by | est mort| a ete tue| a été tué)/.test(normalized);
+      /\b(was slain by|was shot by|was blown up by|was fireballed by|drowned|hit the ground too hard|fell from a high place|burned to death|went up in flames|died|was killed by|est mort|a ete tue|a été tué)\b/.test(normalized);
 
     if (isPlayerDeath) {
       this.registerPlayerDeath();
