@@ -1,6 +1,6 @@
 # Minecraft Tchat Controller
 
-Bridge Twitch + Discord -> actions Minecraft Java (vanilla) via RCON.
+Bridge Twitch + Discord -> actions Minecraft Java (Paper) via RCON.
 
 Ce README est volontairement ecrit comme un document de passation: un autre agent doit pouvoir reprendre le developpement sans contexte externe.
 
@@ -12,13 +12,17 @@ Objectif:
 - Declencher des commandes Minecraft via RCON sur un serveur local
 - Appliquer un multiplicateur plus fort cote Discord
 - Appliquer un cooldown global (5 secondes)
+- Afficher un overlay OBS en temps reel (timer speedrun + stats de session)
+- Permettre le reset de map via commande moderateur
 
 Contexte utilisateur valide:
-- Minecraft Java vanilla
+- Minecraft Java Paper
+- Solo (un seul joueur sur le serveur)
 - Pas de second compte Minecraft pour un bot in-game
 - Choix d'architecture: RCON (pas de mineflayer)
 - Serveur Discord de test deja disponible
 - Twitch OAuth deja disponible
+- Objectif live: speedrun Ender Dragon le plus rapide possible
 
 ## 2) Etat actuel du code
 
@@ -30,19 +34,28 @@ Implante:
 - Cooldown global en memoire
 - Notification Minecraft via `/say`
 
-Non implante (important):
+Non implante (backlog):
+- Overlay OBS (timer + stats)
+- Reset de map via `!resetmap`
+- Detection mort Ender Dragon
+- Systeme de stats session + stats globales persistees
+- Mini-boss tous les 100 commandes (desactive par defaut)
+- Changement de scene OBS + effet visuel fin de run (feature future, lien: https://x.com/pixelcinna/status/2044959530677608942)
 - Tests automatises
 - Validation stricte des variables `.env`
 - Restriction par `DISCORD_CHANNEL_ID`
-- Ciblage d'un joueur configurable (actuellement `@p`)
-- Reconnexion automatique robuste en cas de deconnexion reseau
+- Reconnexion automatique robuste
 
 ## 3) Architecture
 
 ```text
 Twitch chat ----> src/bots/twitch.js ----\
-                                                               > src/bots/minecraft.js -> RCON -> Minecraft server
+                                          > src/bots/minecraft.js -> RCON -> Minecraft server
 Discord chat ---> src/bots/discord.js ---/
+
+Overlay OBS  <--- src/overlay/server.js (HTTP local + WebSocket)
+Stats        <--- src/stats/stats.js (session en memoire + persistance JSON)
+Reset        <--- src/reset/reset.js (arret serveur MC, swap map, redemarrage)
 
 Config runtime: src/config.js
 Config metier : config/config.json
@@ -50,43 +63,121 @@ Entry point   : src/index.js
 ```
 
 Fichiers principaux:
-- `src/index.js`: bootstrap, verifications minimales, demarrage des 3 clients
+- `src/index.js`: bootstrap, verifications minimales, demarrage des clients
 - `src/config.js`: charge `config/config.json` + fusion `.env`
-- `src/bots/twitch.js`: parse des messages Twitch et dispatch des commandes
-- `src/bots/discord.js`: parse des messages Discord et dispatch des commandes
-- `src/bots/minecraft.js`: connexion RCON, cooldown global, execution des actions Minecraft
-- `config/config.json`: multiplicateurs Twitch/Discord et options metier
+- `src/bots/twitch.js`: parse messages Twitch, dispatch commandes
+- `src/bots/discord.js`: parse messages Discord, dispatch commandes
+- `src/bots/minecraft.js`: connexion RCON, cooldown global, execution actions
+- `src/overlay/server.js`: serveur HTTP + WebSocket pour overlay OBS
+- `src/overlay/index.html`: page HTML overlay (font Minecraft, icones, timer, stats)
+- `src/stats/stats.js`: gestion stats session + persistance globale JSON
+- `src/reset/reset.js`: logique reset map (arret MC, swap dossiers world, redemarrage)
+- `config/config.json`: toute la config metier
 
-## 4) Commandes metier v1
+## 4) Commandes metier
 
-| Commande | Twitch | Discord | Implementation |
-|---|---:|---:|---|
-| `!tnt` | 1 | 2 | summon TNT au-dessus du joueur cible |
-| `!mob` | 1 | 3 | summon mob aleatoire `creeper/zombie/skeleton` |
-| `!foudre` | 1 | 2 | summon `lightning_bolt` sur le joueur cible |
+| Commande | Qui peut l'utiliser | Twitch | Discord | Implementation |
+|---|---|---:|---:|---|
+| `!tnt` | Tous | 1 | 2 | summon TNT au-dessus du joueur |
+| `!mob` | Tous | 1 | 3 | summon mob aleatoire parmi liste config |
+| `!foudre` | Tous | 1 | 2 | summon `lightning_bolt` sur le joueur |
+| `!resetmap` | Moderateurs Twitch uniquement | - | - | countdown 3s puis reset map |
 
 Cooldown:
 - Global: 5000 ms
 - Comportement: toute commande recue pendant le cooldown est ignoree
 
-## 5) Prerequis
+Mobs disponibles (configurables dans `config.json`):
+- creeper, zombie, skeleton, spider, enderman, blaze, witch
+- Rarete configurable (ex: 1% de chance Warden)
 
-- Node.js 18+ recommande
-- Serveur Minecraft Java (local) avec RCON active
-- Credentials Twitch bot (username + oauth)
-- Token bot Discord
+## 5) Systeme de stats
 
-## 6) Installation
+Stats de session (remises a zero au spawn dans le nouveau monde):
+- Nombre de TNT explosees
+- Nombre de mobs spawnes
+- Nombre de foudres
+- Nombre de morts du joueur
 
-```bash
-npm install
+Stats globales (persistees dans `data/stats-global.json`, jamais remises a zero):
+- Cumul de toutes les sessions
+- Sauvegarde automatique a chaque evenement
+
+## 6) Overlay OBS
+
+Fichier: `src/overlay/index.html`
+A ajouter dans OBS comme source "Navigateur" sur `http://localhost:3001`
+
+Contenu affiche:
+- Timer speedrun en police Minecraft, demarre au premier spawn dans le monde, se fige a la mort de l'Ender Dragon
+- PB (personal best) affiche seulement si un PB existe (persiste entre sessions et changements de seed)
+- Icone TNT + compteur
+- Icone mob + compteur
+- Icone foudre + compteur
+- Icone mort + compteur
+
+Mise a jour en temps reel via WebSocket.
+
+## 7) Reset de map (!resetmap)
+
+Reservé aux moderateurs Twitch uniquement.
+
+Sequence:
+1. Verification role moderateur
+2. Annonce countdown dans Minecraft (`/say Redemarrage dans 3... 2... 1...`)
+3. Arret propre du serveur Minecraft
+4. Suppression des dossiers `world/`, `world_nether/`, `world_the_end/`
+5. Copie des dossiers template `world-template/`, `world_nether-template/`, `world_the_end-template/`
+6. Application de la seed (aleatoire ou fixe selon config)
+7. Redemarrage du serveur Minecraft
+8. Remise a zero des stats de session
+9. Le timer redemarre au prochain spawn du joueur
+
+Config seed dans `config.json`:
+```json
+{
+  "reset": {
+    "seedMode": "random",
+    "fixedSeed": ""
+  }
+}
+```
+- `seedMode: "random"` — seed aleatoire a chaque reset
+- `seedMode: "fixed"` — utilise `fixedSeed`
+
+## 8) Detection evenements Minecraft
+
+Via lecture des logs du serveur (`logs/latest.log`) en temps reel (tail) :
+- Premier spawn joueur → demarre le timer overlay
+- Mort du joueur → incremente compteur morts + stats
+- Mort de l'Ender Dragon → fige le timer, sauvegarde PB si meilleur temps, envoie message Twitch
+
+Message Twitch fin de run:
+> "🎉 GG ! Ender Dragon tué en [temps] ! TNT: [n] | Mobs: [n] | Foudres: [n] | Morts: [n]"
+
+## 9) Mini-boss (desactive par defaut)
+
+Tous les 100 commandes executees, spawn d'un boss aleatoire parmi une liste configurable.
+Activable dans `config.json`:
+```json
+{
+  "miniboss": {
+    "enabled": false,
+    "interval": 100,
+    "types": ["wither", "elder_guardian", "warden"]
+  }
+}
 ```
 
-## 7) Configuration `.env`
+## 10) Prerequis
 
-Le projet lit automatiquement `.env` via `dotenv`.
+- Node.js 18+
+- Serveur Minecraft Java Paper (local) avec RCON active
+- Credentials Twitch bot (username + oauth)
+- Token bot Discord
+- Dossiers template de map vierge crees une fois manuellement
 
-Exemple:
+## 11) Configuration `.env`
 
 ```env
 # Twitch
@@ -103,143 +194,142 @@ MINECRAFT_RCON_HOST=localhost
 MINECRAFT_RCON_PORT=25575
 MINECRAFT_RCON_PASSWORD=motdepasse_rcon
 
+# Minecraft serveur (pour reset)
+MINECRAFT_SERVER_PATH=C:/minecraft-server
+MINECRAFT_SERVER_JAR=paper.jar
+MINECRAFT_SERVER_JAVA_ARGS=-Xmx4G -Xms1G
+
+# Overlay
+OVERLAY_PORT=3001
+
 # Logs
 DEBUG=false
 ```
 
-## 8) Configuration metier `config/config.json`
-
-Points principaux:
-- `cooldown.global`: delai global en millisecondes
-- `commands.<nom>.twitch.count`: intensite Twitch
-- `commands.<nom>.discord.count`: intensite Discord
-- `features.notifications`: active `/say` dans Minecraft
-
-Extrait courant:
+## 12) Configuration metier `config/config.json`
 
 ```json
 {
-   "cooldown": { "global": 5000, "enabled": true },
-   "commands": {
-      "tnt": { "twitch": { "count": 1 }, "discord": { "count": 2 } },
-      "mob": {
-         "twitch": { "count": 1, "types": ["creeper", "zombie", "skeleton"] },
-         "discord": { "count": 3, "types": ["creeper", "zombie", "skeleton"] }
-      },
-      "foudre": { "twitch": { "count": 1 }, "discord": { "count": 2 } }
-   }
+  "cooldown": { "global": 5000, "enabled": true },
+  "commands": {
+    "tnt": { "twitch": { "count": 1 }, "discord": { "count": 2 } },
+    "mob": {
+      "twitch": { "count": 1 },
+      "discord": { "count": 3 },
+      "types": ["creeper", "zombie", "skeleton", "spider", "enderman", "blaze", "witch"],
+      "rare": { "warden": 1 }
+    },
+    "foudre": { "twitch": { "count": 1 }, "discord": { "count": 2 } }
+  },
+  "reset": {
+    "seedMode": "random",
+    "fixedSeed": ""
+  },
+  "miniboss": {
+    "enabled": false,
+    "interval": 100,
+    "types": ["wither", "elder_guardian", "warden"]
+  },
+  "features": {
+    "notifications": true,
+    "overlay": true,
+    "globalStats": true
+  }
 }
 ```
 
-## 9) Configuration Minecraft RCON
+## 13) Configuration Minecraft RCON
 
 Dans `server.properties`:
-
 ```properties
 enable-rcon=true
 rcon.port=25575
 rcon.password=motdepasse_rcon
 ```
 
-Puis redemarrer le serveur Minecraft.
-
-Notes:
-- Le mot de passe doit correspondre a `MINECRAFT_RCON_PASSWORD`
-- Le bot envoie des commandes serveur, il ne se connecte pas comme joueur
-
-## 10) Lancement
-
-Mode normal:
+## 14) Lancement
 
 ```bash
+npm install
 npm start
 ```
 
-Mode dev (watch):
-
+Mode dev:
 ```bash
 npm run dev
 ```
 
-## 11) Logs attendus au demarrage
+## 15) Logs attendus au demarrage
 
-Sequence nominale:
 - `Connexion au serveur Minecraft...`
 - `Connecte au serveur Minecraft RCON`
 - `Bot Twitch connecte`
 - `Bot Discord connecte`
+- `Overlay OBS disponible sur http://localhost:3001`
 - `Tous les bots sont connectes et prets`
 
-## 12) Erreurs frequentes et correction
+## 16) Erreurs frequentes
 
-`ECONNREFUSED` cote RCON:
-- Cause: serveur Minecraft arrete, mauvais port, RCON desactive
-- Fix: verifier `enable-rcon`, `rcon.port`, redemarrer serveur
+`ECONNREFUSED` RCON: verifier `enable-rcon`, `rcon.port`, redemarrer serveur
+`Authentication failed` RCON: aligner `.env` et `server.properties`
+Bot Discord muet: activer Message Content Intent + verifier droits bot
+Twitch ne capte pas: verifier `TWITCH_OAUTH_TOKEN`, `TWITCH_CHANNEL`
+Reset echoue: verifier `MINECRAFT_SERVER_PATH`, droits fichiers, dossiers template presents
 
-`Authentication failed` RCON:
-- Cause: mauvais `MINECRAFT_RCON_PASSWORD`
-- Fix: aligner `.env` et `server.properties`
+## 17) Dette technique et limites connues
 
-Bot Discord connecte mais n'agit pas:
-- Cause probable: bot sans intent Message Content ou mauvais salon
-- Fix: activer Message Content Intent dans le portal Discord + verifier droits du bot
+1. Ciblage joueur: utilise `@p`, pas un pseudo configurable
+2. Filtrage Discord: `DISCORD_CHANNEL_ID` present en config mais pas encore applique
+3. Cooldown en memoire: se reset au redemarrage
+4. Resilience: pas de retry/backoff centralise sur les deconnexions
+5. Detection evenements: basee sur parsing logs, fragile si format de log change
 
-Twitch ne capte pas les commandes:
-- Cause probable: token OAuth invalide / channel incorrect
-- Fix: verifier `TWITCH_OAUTH_TOKEN`, `TWITCH_CHANNEL`, username bot
+## 18) Backlog priorise
 
-## 13) Dette technique et limites connues
-
-1. Ciblage joueur
-- Le code utilise `@p`, pas un pseudo configurable.
-- Effet: si plusieurs joueurs sont proches, la cible peut etre ambiguë.
-
-2. Filtrage Discord
-- `DISCORD_CHANNEL_ID` est present en config mais pas encore applique.
-- Effet: tout salon ou le bot lit les messages peut declencher des commandes.
-
-3. Cooldown en memoire
-- Le cooldown se reset au redemarrage.
-- Pas de stats, pas de queue, pas de feedback explicite cote Twitch/Discord.
-
-4. Resilience
-- Pas de strategie de retry/backoff centralisee sur les deconnexions.
-
-## 14) Backlog priorise (pour le prochain agent)
-
-P0 (important avant usage intensif):
-1. Appliquer le filtre `DISCORD_CHANNEL_ID` dans `src/bots/discord.js`
-2. Ajouter validation stricte de `.env` au boot (valeurs manquantes + format)
-3. Rendre le joueur cible configurable (`TARGET_PLAYER`) au lieu de `@p`
+P0:
+1. Overlay OBS (timer + stats temps reel)
+2. Reset de map `!resetmap` (moderateurs uniquement)
+3. Detection mort Ender Dragon (fin de run)
+4. Stats session + persistance globale
 
 P1:
-1. Ajouter tests unitaires du routeur de commandes
-2. Ajouter logs structures (niveau info/warn/error)
-3. Ajouter message de retour (commande ignoree pour cooldown)
+1. Detection mort joueur (compteur morts)
+2. Message Twitch fin de run
+3. Appliquer filtre `DISCORD_CHANNEL_ID`
+4. Validation stricte `.env` au boot
+5. Rendre joueur cible configurable (`TARGET_PLAYER`)
 
 P2:
-1. Ajouter commandes dynamiques depuis `config/config.json`
-2. Ajouter permissions (roles Discord, mod Twitch)
-3. Ajouter anti-spam par utilisateur en plus du cooldown global
+1. Mini-boss tous les 100 commandes
+2. Cooldown par viewer
+3. Permissions roles Discord / mod Twitch avances
+4. Logs structures (info/warn/error)
 
-## 15) Definition of Done (v1 stable)
+P3 (future):
+1. Changement scene OBS + effet visuel fin de run
+   Reference: https://x.com/pixelcinna/status/2044959530677608942
 
-Checklist reprise:
-- [ ] Twitch `!tnt` provoque 1 TNT
-- [ ] Discord `!tnt` provoque 2 TNT
-- [ ] `!mob` respecte les multiplicateurs Twitch/Discord
-- [ ] `!foudre` respecte les multiplicateurs Twitch/Discord
-- [ ] Cooldown global 5s applique entre toutes sources confondues
-- [ ] Notification `/say` affiche la source
-- [ ] Le bot redemarre proprement sans fuite de connexion
+## 19) Definition of Done (v2 stable)
 
-## 16) Securite
+- [ ] `!tnt` provoque 1 TNT (Twitch) / 2 TNT (Discord)
+- [ ] `!mob` spawn mob aleatoire parmi liste config
+- [ ] `!foudre` respecte multiplicateurs
+- [ ] `!resetmap` reserve moderateurs, countdown 3s, reset effectif
+- [ ] Timer OBS demarre au spawn, se fige a la mort du Dragon
+- [ ] PB affiche seulement si existant
+- [ ] Stats session affichees en overlay (TNT, mobs, foudres, morts)
+- [ ] Stats globales persistees dans `data/stats-global.json`
+- [ ] Message Twitch envoye en fin de run
+- [ ] Cooldown global 5s applique toutes sources confondues
+
+## 20) Securite
 
 - Ne jamais commiter `.env`
 - Regenerer les tokens en cas de fuite
 - Utiliser un mot de passe RCON fort
 - Limiter les droits Discord du bot au minimum necessaire
+- `!resetmap` strictement reserve aux moderateurs Twitch
 
-## 17) Licence
+## 21) Licence
 
 MIT
