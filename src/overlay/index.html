@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Minecraft Speedrun Overlay</title>
+  <style>
+    @import url('https://fonts.cdnfonts.com/css/minecraft-4');
+
+    :root {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      background: transparent;
+      color: #fff;
+      font-family: 'Minecraft', 'Minecraftia', monospace;
+      text-shadow: 2px 2px 0 #000;
+    }
+
+    .overlay {
+      width: 520px;
+      padding: 18px 20px;
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      background: rgba(0, 0, 0, 0.55);
+      image-rendering: pixelated;
+    }
+
+    .timer {
+      font-size: 44px;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+      line-height: 1;
+    }
+
+    .pb {
+      font-size: 18px;
+      margin-bottom: 14px;
+      color: #ffd54a;
+    }
+
+    .pb.hidden {
+      display: none;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px 16px;
+    }
+
+    .stat {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 22px;
+      min-height: 36px;
+    }
+
+    .icon {
+      width: 26px;
+      height: 26px;
+      image-rendering: pixelated;
+      flex-shrink: 0;
+    }
+
+    .value {
+      min-width: 32px;
+      text-align: right;
+    }
+  </style>
+</head>
+<body>
+  <div class="overlay">
+    <div id="timer" class="timer">00:00.000</div>
+    <div id="pb" class="pb hidden"></div>
+
+    <div class="stats">
+      <div class="stat"><img class="icon" src="/assets/tnt.png" alt="TNT" /><span class="value" id="count-tnt">0</span></div>
+      <div class="stat"><img class="icon" src="/assets/mob.png" alt="Mob" /><span class="value" id="count-mob">0</span></div>
+      <div class="stat"><img class="icon" src="/assets/lightning.png" alt="Foudre" /><span class="value" id="count-foudre">0</span></div>
+      <div class="stat"><img class="icon" src="/assets/death.png" alt="Mort" /><span class="value" id="count-mort">0</span></div>
+    </div>
+  </div>
+
+  <script>
+    const timerEl = document.getElementById('timer');
+    const pbEl = document.getElementById('pb');
+
+    const countEls = {
+      tnt: document.getElementById('count-tnt'),
+      mob: document.getElementById('count-mob'),
+      foudre: document.getElementById('count-foudre'),
+      mort: document.getElementById('count-mort')
+    };
+
+    const state = {
+      timer: { startedAt: null, endedAt: null },
+      personalBestMs: null,
+      counters: { tnt: 0, mob: 0, foudre: 0, mort: 0 }
+    };
+
+    function formatDuration(ms) {
+      const total = Math.max(0, ms || 0);
+      const minutes = Math.floor(total / 60000);
+      const seconds = Math.floor((total % 60000) / 1000);
+      const millis = total % 1000;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(millis).padStart(3, '0')}`;
+    }
+
+    function render() {
+      const { startedAt, endedAt } = state.timer;
+      let elapsed = 0;
+
+      if (startedAt) {
+        elapsed = (endedAt || Date.now()) - startedAt;
+      }
+
+      timerEl.textContent = formatDuration(elapsed);
+
+      if (state.personalBestMs) {
+        pbEl.classList.remove('hidden');
+        pbEl.textContent = `PB: ${formatDuration(state.personalBestMs)}`;
+      } else {
+        pbEl.classList.add('hidden');
+        pbEl.textContent = '';
+      }
+
+      Object.keys(countEls).forEach((key) => {
+        countEls[key].textContent = String(state.counters[key] || 0);
+      });
+    }
+
+    function applyState(next) {
+      if (!next) return;
+      state.timer = next.timer || state.timer;
+      state.personalBestMs = next.personalBestMs || null;
+      state.counters = next.counters || state.counters;
+      render();
+    }
+
+    function connect() {
+      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${protocol}://${location.host}/ws`);
+
+      ws.addEventListener('message', (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.type === 'state') {
+            applyState(data.payload);
+          }
+        } catch (_) {}
+      });
+
+      ws.addEventListener('close', () => {
+        setTimeout(connect, 1000);
+      });
+    }
+
+    setInterval(render, 100);
+    render();
+    connect();
+  </script>
+</body>
+</html>

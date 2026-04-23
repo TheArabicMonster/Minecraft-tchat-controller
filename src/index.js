@@ -2,6 +2,7 @@ require('dotenv').config();
 const minecraftBot = require('./bots/minecraft');
 const twitchBot = require('./bots/twitch');
 const discordBot = require('./bots/discord');
+const overlayServer = require('./overlay/server');
 const config = require('./config');
 
 async function main() {
@@ -15,6 +16,10 @@ async function main() {
   }
 
   try {
+    if (config.features.overlay) {
+      overlayServer.start();
+    }
+
     // 1. Connecter au serveur Minecraft
     console.log('📡 Connexion au serveur Minecraft...');
     const minecraftConnected = await minecraftBot.connect();
@@ -44,6 +49,7 @@ async function main() {
 // Gestion des arrêts propres
 process.on('SIGINT', async () => {
   console.log('\n\n🛑 Arrêt du bot...');
+  await overlayServer.stop();
   await twitchBot.disconnect();
   await discordBot.disconnect();
   await minecraftBot.disconnect();
