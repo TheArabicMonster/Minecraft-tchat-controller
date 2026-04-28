@@ -12,7 +12,8 @@ class OverlayServer {
     this.state = {
       timer: {
         startedAt: null,
-        endedAt: null
+        endedAt: null,
+        endedReason: null
       },
       personalBestMs: null,
       counters: {
@@ -146,8 +147,13 @@ class OverlayServer {
   }
 
   registerPlayerSpawn() {
+    if (this.state.timer.startedAt && this.state.timer.endedReason === 'death') {
+      return;
+    }
+
     this.state.timer.startedAt = Date.now();
     this.state.timer.endedAt = null;
+    this.state.timer.endedReason = null;
     this.state.counters = {
       tnt: 0,
       mob: 0,
@@ -162,6 +168,8 @@ class OverlayServer {
       return;
     }
 
+    this.state.timer.endedAt = Date.now();
+    this.state.timer.endedReason = 'death';
     this.state.counters.mort += 1;
     this.broadcastState();
   }
@@ -172,6 +180,7 @@ class OverlayServer {
     }
 
     this.state.timer.endedAt = Date.now();
+    this.state.timer.endedReason = 'dragon';
     const runTime = this.state.timer.endedAt - this.state.timer.startedAt;
 
     if (!this.state.personalBestMs || runTime < this.state.personalBestMs) {
@@ -298,7 +307,7 @@ class OverlayServer {
     }
 
     const isPlayerDeath =
-      /\b(was slain by|was shot by|was blown up by|was fireballed by|drowned|hit the ground too hard|fell from a high place|burned to death|went up in flames|died|was killed by|est mort|a ete tue|a été tué)\b/.test(normalized);
+      /\b(was slain by|was shot by|was blown up by|was fireballed by|drowned|hit the ground too hard|fell from a high place|burned to death|went up in flames|tried to swim in lava|died|was killed by|est mort|a ete tue|a été tué)\b/.test(normalized);
 
     if (isPlayerDeath) {
       this.registerPlayerDeath();
