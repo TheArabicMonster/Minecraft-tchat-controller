@@ -48,5 +48,9 @@
     "notifications": true,
     "logCommands": true,
     "overlay": true
+  },
+  "reset": {
+    "seedMode": "random",
+    "fixedSeed": ""
   }
 }

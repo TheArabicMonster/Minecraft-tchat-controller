@@ -3,6 +3,7 @@ const minecraftBot = require('./bots/minecraft');
 const twitchBot = require('./bots/twitch');
 const discordBot = require('./bots/discord');
 const overlayServer = require('./overlay/server');
+const resetManager = require('./reset/reset');
 const config = require('./config');
 
 async function main() {
@@ -22,10 +23,20 @@ async function main() {
 
     // 1. Connecter au serveur Minecraft
     console.log('📡 Connexion au serveur Minecraft...');
-    const minecraftConnected = await minecraftBot.connect();
+    let minecraftConnected = await minecraftBot.connect();
     if (!minecraftConnected) {
-      console.error('❌ Impossible de se connecter à Minecraft RCON');
-      process.exit(1);
+      console.log('🚀 Démarrage du serveur Minecraft (auto)...');
+      resetManager.startServer();
+
+      minecraftConnected = await minecraftBot.connect({
+        maxAttempts: 12,
+        retryDelay: 5000
+      });
+
+      if (!minecraftConnected) {
+        console.error('❌ Impossible de se connecter à Minecraft RCON');
+        process.exit(1);
+      }
     }
 
     // 2. Initialiser et connecter les bots Twitch et Discord

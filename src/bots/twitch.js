@@ -63,7 +63,10 @@ class TwitchBot {
     const commandName = command.slice(1);
     const username = tags['display-name'] || tags.username;
     const source = `twitch_${username}`;
-    const isModerator = tags.mod || tags.badges?.moderator === '1';
+    const isModerator =
+      tags.mod ||
+      tags.badges?.moderator === '1' ||
+      tags.badges?.broadcaster === '1';
 
     console.log(`📺 [Twitch] ${username}: ${message}`);
 
@@ -107,6 +110,20 @@ class TwitchBot {
   async disconnect() {
     if (this.client) {
       await this.client.disconnect();
+    }
+  }
+
+  async sendMessage(message) {
+    if (!this.client || !this.connected) {
+      return false;
+    }
+
+    try {
+      await this.client.say(config.twitch.channel, message);
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur envoi message Twitch:', error);
+      return false;
     }
   }
 }

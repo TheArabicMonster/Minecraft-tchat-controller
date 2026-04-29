@@ -12,10 +12,10 @@ class RconClient {
     this.playerName = 'nomade'; // À adapter si besoin
   }
 
-  async connect() {
+  async connect(options = {}) {
     let attempts = 0;
-    const maxAttempts = 3;
-    const retryDelay = 5000; // 5 secondes
+    const maxAttempts = options.maxAttempts ?? 3;
+    const retryDelay = options.retryDelay ?? 5000; // 5 secondes
 
     while (attempts < maxAttempts) {
       try {

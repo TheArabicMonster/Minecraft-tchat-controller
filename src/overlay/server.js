@@ -172,6 +172,20 @@ class OverlayServer {
     this.broadcastState();
   }
 
+  resetForNewRun() {
+    this.state.timer.startedAt = null;
+    this.state.timer.endedAt = null;
+    this.state.timer.endedReason = null;
+    this.state.counters = {
+      tnt: 0,
+      mob: 0,
+      foudre: 0,
+      mort: 0
+    };
+
+    this.broadcastState();
+  }
+
   registerPlayerDeath() {
     if (!this.state.timer.startedAt || this.state.timer.endedAt) {
       return;
@@ -318,8 +332,10 @@ class OverlayServer {
     }
 
     const isDragonDeath =
-      /ender dragon/.test(normalized) &&
-      /(was slain|was killed|died|killed|tué|a ete tue|a été tué)/.test(normalized);
+      (/ender dragon/.test(normalized) &&
+        /(was slain|was killed|died|killed|tué|a ete tue|a été tué)/.test(normalized)) ||
+      /has made the advancement \[free the end\]/.test(normalized) ||
+      /a accompli l'avancement \[liberer l'end\]/.test(normalized);
 
     if (isDragonDeath) {
       this.registerDragonDeath();

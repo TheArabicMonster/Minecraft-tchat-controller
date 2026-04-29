@@ -194,6 +194,15 @@ MINECRAFT_RCON_HOST=localhost
 MINECRAFT_RCON_PORT=25575
 MINECRAFT_RCON_PASSWORD=motdepasse_rcon
 
+# Reset map
+MINECRAFT_USE_TEMPLATES=true
+
+# Minecraft server path + java
+MINECRAFT_SERVER_PATH=C:/MinecraftServer
+MINECRAFT_SERVER_JAR=server.jar
+MINECRAFT_SERVER_JAVA_ARGS=-Xmx4G -Xms1G
+JAVA_PATH=C:/Program Files/Java/jdk-21/bin/java.exe
+
 # Minecraft serveur (pour reset)
 MINECRAFT_SERVER_PATH=C:/minecraft-server
 MINECRAFT_SERVER_JAR=paper.jar
