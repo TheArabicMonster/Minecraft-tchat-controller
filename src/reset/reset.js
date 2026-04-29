@@ -24,6 +24,14 @@ class MapResetManager {
     this.isResetting = true;
     
     try {
+      // Vérifier que les templates existent
+      if (!fs.existsSync(this.worldTemplate)) {
+        await minecraftBot.executeCommand('/say ❌ Erreur: Template de map introuvable. Reset annulé.');
+        console.error('❌ Template de map introuvable:', this.worldTemplate);
+        this.isResetting = false;
+        return false;
+      }
+      
       // Countdown
       for (let i = 3; i >= 1; i--) {
         await minecraftBot.executeCommand(`/say Redémarrage dans ${i}...`);
@@ -55,12 +63,20 @@ class MapResetManager {
       // Restart server
       this.startServer();
       
+      // Reset session stats and timer
+      const statsManager = require('../stats/stats');
+      statsManager.resetSessionStats();
+      
+      const overlayServer = require('../overlay/server');
+      overlayServer.registerPlayerSpawn(); // Réinitialise le timer et compteurs
+      
       console.log('✅ Map réinitialisée avec succès');
       this.isResetting = false;
       return true;
       
     } catch (error) {
       console.error('❌ Erreur lors du reset de la map:', error);
+      await minecraftBot.executeCommand('/say ❌ Erreur lors du reset de la map.');
       this.isResetting = false;
       return false;
     }

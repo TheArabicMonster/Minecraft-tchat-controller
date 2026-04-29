@@ -1,5 +1,11 @@
 const fs = require('fs');
 const path = require('path');
+
+// Créer le dossier logs s'il n'existe pas
+const logsDir = path.join(process.cwd(), 'logs');
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
 const http = require('http');
 const { WebSocket, WebSocketServer } = require('ws');
 const statsManager = require('../stats/stats');
