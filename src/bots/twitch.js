@@ -96,6 +96,7 @@ class TwitchBot {
           minecraftBot.resetMap();
         } else {
           console.log(`⚠️ [Twitch] ${source.split('_')[1]} a tenté !resetmap sans permissions mod`);
+          minecraftBot.executeCommand('/say ❌ Commande !resetmap réservée aux modérateurs Twitch.');
         }
         break;
       default:

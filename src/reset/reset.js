@@ -26,7 +26,8 @@ class MapResetManager {
     try {
       // Vérifier que les templates existent
       if (!fs.existsSync(this.worldTemplate)) {
-        await minecraftBot.executeCommand('/say ❌ Erreur: Template de map introuvable. Reset annulé.');
+        const errorMsg = '❌ Erreur: Template de map introuvable. Reset annulé.';
+        await minecraftBot.executeCommand(`/say ${errorMsg}`);
         console.error('❌ Template de map introuvable:', this.worldTemplate);
         this.isResetting = false;
         return false;
@@ -69,6 +70,9 @@ class MapResetManager {
       
       const overlayServer = require('../overlay/server');
       overlayServer.registerPlayerSpawn(); // Réinitialise le timer et compteurs
+      
+      // Annonce de succès
+      await minecraftBot.executeCommand('/say ✅ Map réinitialisée avec succès ! Timer et stats remis à zéro.');
       
       console.log('✅ Map réinitialisée avec succès');
       this.isResetting = false;

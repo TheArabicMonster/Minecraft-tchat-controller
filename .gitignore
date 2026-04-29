@@ -1,10 +1,10 @@
-```
 # Dependencies
 node_modules/
 
 # Logs and temp files
 *.log
 *.tmp
+logs/
 
 # Environment
 .env
@@ -21,4 +21,6 @@ build/
 *.min.js
 *.bundle.js
 coverage/
-```
+
+# Data files (persistent stats)
+data/

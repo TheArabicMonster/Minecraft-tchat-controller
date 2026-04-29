@@ -87,6 +87,10 @@ class DiscordBot {
           source
         );
         break;
+      case 'resetmap':
+        console.log(`⚠️ [Discord] ${source.split('_')[1]} a tenté !resetmap (non supporté sur Discord)`);
+        minecraftBot.executeCommand('/say ❌ Commande !resetmap disponible uniquement sur Twitch.');
+        break;
       default:
         if (config.debug) console.log(`Commande Discord inconnue: ${commandName}`);
     }
