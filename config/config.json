@@ -46,6 +46,7 @@
   },
   "features": {
     "notifications": true,
-    "logCommands": true
+    "logCommands": true,
+    "overlay": true
   }
 }
