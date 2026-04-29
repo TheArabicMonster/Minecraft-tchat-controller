@@ -42,6 +42,14 @@ class TwitchBot {
   onDisconnected() {
     this.connected = false;
     console.log('❌ Bot Twitch déconnecté');
+    
+    // Auto-reconnect after 5 seconds
+    setTimeout(() => {
+      if (!this.connected) {
+        console.log('🔄 Tentative de reconnexion Twitch...');
+        this.connect();
+      }
+    }, 5000);
   }
 
   onMessage(channel, tags, message, self) {
@@ -55,13 +63,14 @@ class TwitchBot {
     const commandName = command.slice(1);
     const username = tags['display-name'] || tags.username;
     const source = `twitch_${username}`;
+    const isModerator = tags.mod || tags.badges?.moderator === '1';
 
     console.log(`📺 [Twitch] ${username}: ${message}`);
 
-    this.handleCommand(commandName, source);
+    this.handleCommand(commandName, source, isModerator);
   }
 
-  handleCommand(commandName, source) {
+  handleCommand(commandName, source, isModerator = false) {
     switch (commandName) {
       case 'tnt':
         minecraftBot.spawnTnt(
@@ -80,6 +89,14 @@ class TwitchBot {
           config.commands.foudre.twitch.count,
           source
         );
+        break;
+      case 'resetmap':
+        if (isModerator) {
+          console.log(`🔄 [Twitch] ${source.split('_')[1]} a demandé un reset de la map`);
+          minecraftBot.resetMap();
+        } else {
+          console.log(`⚠️ [Twitch] ${source.split('_')[1]} a tenté !resetmap sans permissions mod`);
+        }
         break;
       default:
         if (config.debug) console.log(`Commande Twitch inconnue: ${commandName}`);

@@ -1,6 +1,7 @@
 const { RCON } = require('minecraft-server-util');
 const config = require('../config');
 const overlayServer = require('../overlay/server');
+const statsManager = require('../stats/stats');
 
 // État global
 let lastCommandTime = 0;
@@ -79,6 +80,7 @@ class RconClient {
 
     this.updateCooldown();
     overlayServer.registerCommand('tnt', count);
+    statsManager.incrementStat('tnt', count);
     
     if (config.features.notifications) {
       await this.notifyChat(source, '!tnt', count);
@@ -93,7 +95,11 @@ class RconClient {
       return false;
     }
 
-    const mobTypes = config.commands.mob.twitch.types;
+    const isDiscord = source.includes('discord');
+    const mobConfig = isDiscord 
+      ? config.commands.mob.discord.types 
+      : config.commands.mob.twitch.types;
+    const mobTypes = mobConfig || ['creeper', 'zombie', 'skeleton'];
     
     for (let i = 0; i < count; i++) {
       const randomMob = mobTypes[Math.floor(Math.random() * mobTypes.length)];
@@ -104,6 +110,7 @@ class RconClient {
 
     this.updateCooldown();
     overlayServer.registerCommand('mob', count);
+    statsManager.incrementStat('mob', count);
 
     if (config.features.notifications) {
       await this.notifyChat(source, '!mob', count);
@@ -126,6 +133,7 @@ class RconClient {
 
     this.updateCooldown();
     overlayServer.registerCommand('foudre', count);
+    statsManager.incrementStat('foudre', count);
 
     if (config.features.notifications) {
       await this.notifyChat(source, '!foudre', count);
@@ -141,6 +149,11 @@ class RconClient {
     await this.executeCommand(
       `/say ${sourceLabel} a lancé ${command} (×${count}) - ${effect} activé !`
     );
+  }
+  
+  async resetMap() {
+    const resetManager = require('../reset/reset');
+    return await resetManager.resetMap(this);
   }
 }
 

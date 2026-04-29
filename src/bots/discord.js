@@ -32,10 +32,29 @@ class DiscordBot {
   onReady() {
     this.connected = true;
     console.log(`✅ Bot Discord connecté en tant que ${this.client.user.tag}`);
+    
+    // Auto-reconnect handler
+    this.client.on('disconnect', () => {
+      this.connected = false;
+      console.log('❌ Bot Discord déconnecté');
+      
+      setTimeout(() => {
+        if (!this.connected) {
+          console.log('🔄 Tentative de reconnexion Discord...');
+          this.connect();
+        }
+      }, 5000);
+    });
   }
 
   onMessage(message) {
     if (message.author.bot) return;
+    
+    // Vérifier que le message vient du canal configuré
+    if (config.discord.channelId && message.channel.id !== config.discord.channelId) {
+      return;
+    }
+    
     if (!message.content.startsWith('!')) return;
 
     const args = message.content.split(' ');

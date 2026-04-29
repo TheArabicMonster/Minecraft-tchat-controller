@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const http = require('http');
 const { WebSocket, WebSocketServer } = require('ws');
+const statsManager = require('../stats/stats');
 
 class OverlayServer {
   constructor() {
@@ -39,6 +40,7 @@ class OverlayServer {
     }
 
     this.loadPersistentData();
+    statsManager.loadGlobalStats();
 
     this.httpServer = http.createServer((req, res) => this.handleRequest(req, res));
     this.wss = new WebSocketServer({ noServer: true });
@@ -147,10 +149,7 @@ class OverlayServer {
   }
 
   registerPlayerSpawn() {
-    if (this.state.timer.startedAt && this.state.timer.endedReason === 'death') {
-      return;
-    }
-
+    // Always reset timer and counters on spawn (even after death)
     this.state.timer.startedAt = Date.now();
     this.state.timer.endedAt = null;
     this.state.timer.endedReason = null;
@@ -160,6 +159,10 @@ class OverlayServer {
       foudre: 0,
       mort: 0
     };
+    
+    // Also reset session stats
+    statsManager.resetSessionStats();
+    
     this.broadcastState();
   }
 
@@ -168,9 +171,10 @@ class OverlayServer {
       return;
     }
 
-    this.state.timer.endedAt = Date.now();
-    this.state.timer.endedReason = 'death';
+    // Increment death counter but do NOT stop the timer
+    // Timer only stops when Ender Dragon dies
     this.state.counters.mort += 1;
+    statsManager.incrementStat('mort', 1);
     this.broadcastState();
   }
 
@@ -187,6 +191,9 @@ class OverlayServer {
       this.state.personalBestMs = runTime;
       this.savePersistentData();
     }
+    
+    // Mark run as complete in global stats
+    statsManager.completeRun(runTime);
 
     this.broadcastState();
   }
@@ -252,35 +259,42 @@ class OverlayServer {
   }
 
   async pollLogFile() {
-    const stats = await fs.promises.stat(this.logPath);
-
-    if (!this.logInitialized) {
-      this.logOffset = stats.size;
-      this.logInode = stats.ino;
-      this.logInitialized = true;
-      return;
-    }
-
-    if (this.logInode !== stats.ino || stats.size < this.logOffset) {
-      this.logInode = stats.ino;
-      this.logOffset = 0;
-    }
-
-    if (stats.size === this.logOffset) {
-      return;
-    }
-
-    const length = stats.size - this.logOffset;
-    const handle = await fs.promises.open(this.logPath, 'r');
-
     try {
-      const buffer = Buffer.alloc(length);
-      await handle.read(buffer, 0, length, this.logOffset);
-      this.logOffset = stats.size;
-      const lines = buffer.toString('utf8').split(/\r?\n/);
-      lines.forEach((line) => this.processLogLine(line));
-    } finally {
-      await handle.close();
+      const stats = await fs.promises.stat(this.logPath);
+
+      if (!this.logInitialized) {
+        this.logOffset = stats.size;
+        this.logInode = stats.ino;
+        this.logInitialized = true;
+        return;
+      }
+
+      if (this.logInode !== stats.ino || stats.size < this.logOffset) {
+        this.logInode = stats.ino;
+        this.logOffset = 0;
+      }
+
+      if (stats.size === this.logOffset) {
+        return;
+      }
+
+      const length = stats.size - this.logOffset;
+      const handle = await fs.promises.open(this.logPath, 'r');
+
+      try {
+        const buffer = Buffer.alloc(length);
+        await handle.read(buffer, 0, length, this.logOffset);
+        this.logOffset = stats.size;
+        const lines = buffer.toString('utf8').split(/\r?\n/);
+        lines.forEach((line) => this.processLogLine(line));
+      } finally {
+        await handle.close();
+      }
+    } catch (error) {
+      // Ignore ENOENT errors (log file doesn't exist yet)
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
     }
   }
 
