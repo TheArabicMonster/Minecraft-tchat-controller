@@ -249,6 +249,12 @@ rcon.password=motdepasse_rcon
 
 ## 14) Lancement
 
+Lancer le serveur Minecraft (adapter le chemin si besoin):
+```bash
+cd C:/MinecraftServer
+java -Xmx4G -Xms1G -jar server.jar nogui
+```
+
 ```bash
 npm install
 npm start
